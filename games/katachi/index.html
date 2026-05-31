@@ -54,7 +54,20 @@
       text-shadow: 0 3px 10px rgba(0,0,0,0.3);
       letter-spacing: 0.12em;
     }
-    .spacer { width: 80px; }
+    /* 🔊 ボタン */
+    .sound-btn {
+      background: rgba(255,255,255,0.15);
+      border: none; border-radius: 50%;
+      width: clamp(42px,9vw,58px);
+      height: clamp(42px,9vw,58px);
+      font-size: clamp(1.2rem,3vw,1.7rem);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, transform 0.15s;
+      flex-shrink: 0;
+    }
+    .sound-btn:active { transform: scale(0.88); }
+    .sound-btn.muted  { background: rgba(255,80,80,0.35); }
 
     /* ===== 穴エリア ===== */
     .holes-row {
@@ -64,14 +77,12 @@
       align-items: center;
       flex-shrink: 0;
     }
-
     .hole-wrapper {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 10px;
     }
-
     .hole {
       width:  clamp(108px, 25vw, 175px);
       height: clamp(108px, 25vw, 175px);
@@ -94,8 +105,6 @@
       font-weight: bold;
       letter-spacing: 0.08em;
     }
-
-    /* 穴アウトライン */
     .hint-circle {
       width: 72%; height: 72%;
       border-radius: 50%;
@@ -182,8 +191,8 @@
       flex-direction: column; gap: 24px;
     }
     #celebration.show { display: flex; }
-    .cel-big   { font-size: clamp(3.5rem,12vw,6.5rem); animation: pop 0.4s ease-out both; }
-    .cel-text  {
+    .cel-big  { font-size: clamp(3.5rem,12vw,6.5rem); animation: pop 0.4s ease-out both; }
+    .cel-text {
       color: #fff; font-size: clamp(2rem,7vw,4rem);
       text-align: center; text-shadow: 0 3px 12px rgba(0,0,0,0.4);
       animation: pop 0.4s 0.2s ease-out both; line-height: 1.4;
@@ -240,7 +249,7 @@
   <div class="header">
     <a class="back-btn" href="../../">← もどる</a>
     <div class="title">🎮 かたちあわせ</div>
-    <div class="spacer"></div>
+    <button class="sound-btn" id="soundBtn" onclick="toggleSound()" title="音のON/OFF">🔊</button>
   </div>
 
   <!-- 穴 -->
@@ -294,134 +303,258 @@
   </div>
 
 <script>
-  let active=null, startPX=0, startPY=0, curDX=0, curDY=0, placed=0;
+/* =====================================================
+   サウンドマネージャー（Web Audio API）
+===================================================== */
+const Sound = (() => {
+  let ctx = null;
+  let muted = false;
+  let bgmTimeout = null;
+  let bgmPlaying = false;
 
-  document.querySelectorAll('.piece').forEach(p => p.addEventListener('pointerdown', onDown));
-  document.addEventListener('pointermove', onMove);
-  document.addEventListener('pointerup',   onUp);
-  document.addEventListener('pointercancel', onUp);
-
-  function onDown(e) {
-    e.preventDefault();
-    const piece = e.currentTarget;
-    if (piece.dataset.placed === 'true') return;
-    active = piece;
-    startPX = e.clientX; startPY = e.clientY;
-    curDX = curDY = 0;
-    piece.style.zIndex = '500';
-    piece.style.transition = 'none';
-    piece.classList.add('dragging');
-    piece.setPointerCapture(e.pointerId);
-    highlightHole(piece.dataset.shape, true);
+  // AudioContext を遅延初期化（ユーザー操作後に作る）
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
   }
 
-  function onMove(e) {
-    if (!active) return;
-    e.preventDefault();
-    curDX = e.clientX - startPX;
-    curDY = e.clientY - startPY;
-    active.style.transform = `translate(${curDX}px,${curDY}px) scale(1.08)`;
+  // 単音を鳴らす
+  function tone(freq, start, dur, vol = 0.2, type = 'sine') {
+    if (muted) return;
+    const c = getCtx();
+    const osc  = c.createOscillator();
+    const gain = c.createGain();
+    osc.connect(gain);
+    gain.connect(c.destination);
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, start);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    osc.start(start);
+    osc.stop(start + dur + 0.05);
   }
 
-  function onUp(e) {
-    if (!active) return;
-    const piece = active; active = null;
-    piece.classList.remove('dragging');
-    highlightHole(piece.dataset.shape, false);
+  /* ── BGM ──
+     明るいループメロディ（Cメジャー ペンタトニック）
+     8小節ループ / BPM 112
+  */
+  const BPM   = 112;
+  const BEAT  = 60 / BPM;
 
-    const r   = piece.getBoundingClientRect();
-    const pcx = r.left + r.width  / 2;
-    const pcy = r.top  + r.height / 2;
-    const hole = document.getElementById('hole-' + piece.dataset.shape);
-    const hr  = hole.getBoundingClientRect();
-    const hit = pcx >= hr.left && pcx <= hr.right && pcy >= hr.top && pcy <= hr.bottom;
+  // [周波数, 長さ(拍)]
+  const MELODY = [
+    [659,0.5],[659,0.5],[784,0.5],[659,0.5],[880,1.0],[784,0.5],[659,0.5],
+    [659,0.5],[523,0.5],[587,0.5],[659,0.5],[659,1.5],[659,0.5],
+    [784,0.5],[784,0.5],[880,0.5],[784,0.5],[659,1.0],[659,0.5],[587,0.5],
+    [523,0.5],[587,0.5],[659,0.5],[523,0.5],[523,2.0],
+  ];
 
-    hit ? snapIn(piece, hole, hr, r) : snapBack(piece);
+  // ベースライン（1拍おきに低音）
+  const BASS = [
+    [262,0.4],[262,0.4],[294,0.4],[294,0.4],
+    [330,0.4],[330,0.4],[294,0.4],[294,0.4],
+    [349,0.4],[349,0.4],[392,0.4],[392,0.4],
+    [262,0.4],[262,0.4],[262,0.8],
+  ];
+
+  function playBGMBlock(startTime) {
+    if (muted || !bgmPlaying) return;
+    // メロディ
+    let t = startTime;
+    MELODY.forEach(([f, b]) => { tone(f, t, b * BEAT * 0.75, 0.07, 'sine'); t += b * BEAT; });
+    const loopLen = t - startTime;
+
+    // ベースライン（2拍ごとに1音）
+    let bt = startTime;
+    BASS.forEach(([f, b]) => { tone(f, bt, b * BEAT * 2, 0.05, 'triangle'); bt += BEAT * 2; });
+
+    // ループ予約
+    bgmTimeout = setTimeout(() => playBGMBlock(getCtx().currentTime + 0.05), loopLen * 1000 - 80);
   }
 
-  function snapIn(piece, hole, hr, pr) {
-    const dx = (hr.left + hr.width/2) - (pr.left + pr.width/2);
-    const dy = (hr.top + hr.height/2) - (pr.top + pr.height/2);
-    piece.style.transition = 'transform 0.22s cubic-bezier(0.34,1.56,0.64,1)';
-    piece.style.transform  = `translate(${curDX+dx}px,${curDY+dy}px) scale(0.82)`;
-    playNote([523,659,784]);
-    setTimeout(() => {
-      piece.dataset.placed = 'true';
-      hole.innerHTML = placedHTML(piece.dataset.shape);
-      spawnStars(hr);
-      placed++;
-      if (placed === 3) setTimeout(() => {
+  function startBGM() {
+    if (bgmPlaying || muted) return;
+    bgmPlaying = true;
+    const c = getCtx();
+    playBGMBlock(c.currentTime + 0.1);
+  }
+
+  function stopBGM() {
+    bgmPlaying = false;
+    if (bgmTimeout) { clearTimeout(bgmTimeout); bgmTimeout = null; }
+  }
+
+  /* ── 効果音 ── */
+  function sfxPickup() {
+    const c = getCtx(), t = c.currentTime;
+    tone(440, t,      0.06, 0.12, 'sine');
+    tone(554, t+0.04, 0.07, 0.12, 'sine');
+  }
+
+  function sfxCorrect() {
+    const c = getCtx(), t = c.currentTime;
+    [523, 659, 784].forEach((f, i) => tone(f, t + i * 0.1, 0.28, 0.22, 'sine'));
+  }
+
+  function sfxWrong() {
+    const c = getCtx(), t = c.currentTime;
+    tone(280, t,      0.1, 0.18, 'sawtooth');
+    tone(250, t+0.08, 0.1, 0.14, 'sawtooth');
+  }
+
+  function sfxFanfare() {
+    const c = getCtx(), t = c.currentTime;
+    // 上昇フレーズ
+    [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, t + i * 0.1, 0.28, 0.18, 'sine'));
+    // 和音フィニッシュ
+    [523, 659, 784].forEach(f => tone(f, t + 0.7, 0.8, 0.14, 'sine'));
+    // キラキラ高音
+    [2093, 2637].forEach((f, i) => tone(f, t + 0.5 + i * 0.12, 0.2, 0.06, 'sine'));
+  }
+
+  function setMuted(val) { muted = val; if (muted) stopBGM(); else startBGM(); }
+  function isMuted()     { return muted; }
+
+  return { startBGM, stopBGM, sfxPickup, sfxCorrect, sfxWrong, sfxFanfare, setMuted, isMuted };
+})();
+
+/* =====================================================
+   音 ON/OFF トグル
+===================================================== */
+function toggleSound() {
+  const btn = document.getElementById('soundBtn');
+  Sound.setMuted(!Sound.isMuted());
+  btn.textContent = Sound.isMuted() ? '🔇' : '🔊';
+  btn.classList.toggle('muted', Sound.isMuted());
+}
+
+/* =====================================================
+   ゲームロジック
+===================================================== */
+let active=null, startPX=0, startPY=0, curDX=0, curDY=0, placed=0;
+
+document.querySelectorAll('.piece').forEach(p => p.addEventListener('pointerdown', onDown));
+document.addEventListener('pointermove', onMove);
+document.addEventListener('pointerup',   onUp);
+document.addEventListener('pointercancel', onUp);
+
+// 最初のタップでBGM開始（iOSのAutoplay制限対策）
+document.addEventListener('pointerdown', () => Sound.startBGM(), { once: true });
+
+function onDown(e) {
+  e.preventDefault();
+  const piece = e.currentTarget;
+  if (piece.dataset.placed === 'true') return;
+  Sound.sfxPickup();
+  active = piece;
+  startPX = e.clientX; startPY = e.clientY;
+  curDX = curDY = 0;
+  piece.style.zIndex = '500';
+  piece.style.transition = 'none';
+  piece.classList.add('dragging');
+  piece.setPointerCapture(e.pointerId);
+  highlightHole(piece.dataset.shape, true);
+}
+
+function onMove(e) {
+  if (!active) return;
+  e.preventDefault();
+  curDX = e.clientX - startPX;
+  curDY = e.clientY - startPY;
+  active.style.transform = `translate(${curDX}px,${curDY}px) scale(1.08)`;
+}
+
+function onUp(e) {
+  if (!active) return;
+  const piece = active; active = null;
+  piece.classList.remove('dragging');
+  highlightHole(piece.dataset.shape, false);
+
+  const r   = piece.getBoundingClientRect();
+  const pcx = r.left + r.width  / 2;
+  const pcy = r.top  + r.height / 2;
+  const hole = document.getElementById('hole-' + piece.dataset.shape);
+  const hr  = hole.getBoundingClientRect();
+  const hit = pcx >= hr.left && pcx <= hr.right && pcy >= hr.top && pcy <= hr.bottom;
+
+  hit ? snapIn(piece, hole, hr, r) : snapBack(piece);
+}
+
+function snapIn(piece, hole, hr, pr) {
+  const dx = (hr.left + hr.width/2)  - (pr.left + pr.width/2);
+  const dy = (hr.top  + hr.height/2) - (pr.top  + pr.height/2);
+  piece.style.transition = 'transform 0.22s cubic-bezier(0.34,1.56,0.64,1)';
+  piece.style.transform  = `translate(${curDX+dx}px,${curDY+dy}px) scale(0.82)`;
+  Sound.sfxCorrect();
+  setTimeout(() => {
+    piece.dataset.placed = 'true';
+    hole.innerHTML = placedHTML(piece.dataset.shape);
+    spawnStars(hr);
+    placed++;
+    if (placed === 3) {
+      setTimeout(() => {
+        Sound.stopBGM();
+        Sound.sfxFanfare();
         document.getElementById('celebration').classList.add('show');
-        playNote([523,659,784,1047], 0.15);
-      }, 500);
-    }, 220);
-  }
-
-  function snapBack(piece) {
-    piece.style.transition = 'transform 0.38s cubic-bezier(0.68,-0.55,0.27,1.55)';
-    piece.style.transform  = 'translate(0,0) scale(1)';
-    setTimeout(() => { piece.style.zIndex=''; piece.style.transition=''; }, 380);
-  }
-
-  function highlightHole(shape, on) {
-    const h = document.getElementById('hole-' + shape);
-    if (h) h.classList.toggle('active', on);
-  }
-
-  function placedHTML(shape) {
-    if (shape==='circle')   return '<div class="placed-circle">✓</div>';
-    if (shape==='triangle') return '<div class="placed-triangle">▲</div>';
-    return '<div class="placed-square">✓</div>';
-  }
-
-  function spawnStars(hr) {
-    const cx=hr.left+hr.width/2, cy=hr.top+hr.height/2;
-    const em=['⭐','✨','🌟','💫','🎊'];
-    for(let i=0;i<10;i++){
-      const el=document.createElement('div');
-      el.className='star'; el.textContent=em[i%em.length];
-      const ang=(i/10)*Math.PI*2+Math.random()*0.4;
-      const d=70+Math.random()*80;
-      el.style.left=cx+'px'; el.style.top=cy+'px';
-      el.style.setProperty('--dx',Math.cos(ang)*d+'px');
-      el.style.setProperty('--dy',Math.sin(ang)*d+'px');
-      el.style.animationDelay=(i*0.05)+'s';
-      document.body.appendChild(el);
-      setTimeout(()=>el.remove(),950);
+      }, 400);
     }
-  }
+  }, 220);
+}
 
-  function playNote(freqs, interval=0.12) {
-    try {
-      const ctx=new(window.AudioContext||window.webkitAudioContext)();
-      freqs.forEach((f,i)=>{
-        const osc=ctx.createOscillator(), gain=ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value=f; osc.type='sine';
-        const t=ctx.currentTime+i*interval;
-        gain.gain.setValueAtTime(0.28,t);
-        gain.gain.exponentialRampToValueAtTime(0.001,t+0.35);
-        osc.start(t); osc.stop(t+0.35);
-      });
-    } catch(_){}
-  }
+function snapBack(piece) {
+  Sound.sfxWrong();
+  piece.style.transition = 'transform 0.38s cubic-bezier(0.68,-0.55,0.27,1.55)';
+  piece.style.transform  = 'translate(0,0) scale(1)';
+  setTimeout(() => { piece.style.zIndex=''; piece.style.transition=''; }, 380);
+}
 
-  function resetGame() {
-    placed=0;
-    document.getElementById('celebration').classList.remove('show');
-    const hints={
-      circle:'<div class="hint-circle"></div>',
-      triangle:'<div class="hint-triangle"></div>',
-      square:'<div class="hint-square"></div>'
-    };
-    ['circle','triangle','square'].forEach(s=>{
-      document.getElementById('hole-'+s).innerHTML=hints[s];
-    });
-    document.querySelectorAll('.piece').forEach(p=>{
-      delete p.dataset.placed;
-      p.style.cssText=''; p.style.visibility='';
-    });
+function highlightHole(shape, on) {
+  const h = document.getElementById('hole-' + shape);
+  if (h) h.classList.toggle('active', on);
+}
+
+function placedHTML(shape) {
+  if (shape==='circle')   return '<div class="placed-circle">✓</div>';
+  if (shape==='triangle') return '<div class="placed-triangle">▲</div>';
+  return '<div class="placed-square">✓</div>';
+}
+
+function spawnStars(hr) {
+  const cx=hr.left+hr.width/2, cy=hr.top+hr.height/2;
+  const em=['⭐','✨','🌟','💫','🎊'];
+  for(let i=0;i<12;i++){
+    const el=document.createElement('div');
+    el.className='star'; el.textContent=em[i%em.length];
+    const ang=(i/12)*Math.PI*2+Math.random()*0.4;
+    const d=70+Math.random()*90;
+    el.style.left=cx+'px'; el.style.top=cy+'px';
+    el.style.setProperty('--dx',Math.cos(ang)*d+'px');
+    el.style.setProperty('--dy',Math.sin(ang)*d+'px');
+    el.style.animationDelay=(i*0.04)+'s';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),950);
   }
+}
+
+function resetGame() {
+  placed=0;
+  document.getElementById('celebration').classList.remove('show');
+  const hints={
+    circle:'<div class="hint-circle"></div>',
+    triangle:'<div class="hint-triangle"></div>',
+    square:'<div class="hint-square"></div>'
+  };
+  ['circle','triangle','square'].forEach(s=>{
+    document.getElementById('hole-'+s).innerHTML=hints[s];
+  });
+  document.querySelectorAll('.piece').forEach(p=>{
+    delete p.dataset.placed;
+    p.style.cssText=''; p.style.visibility='';
+  });
+  // BGM 再開
+  Sound.startBGM();
+}
 </script>
 </body>
 </html>
