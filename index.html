@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>こどもゲームランド</title>
+  <style>
+    *, *::before, *::after {
+      margin: 0; padding: 0;
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      min-height: 100svh;
+      background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 20px 40px;
+      font-family: 'Hiragino Maru Gothic Pro', 'BIZ UDGothic', 'Rounded Mplus 1c', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* タイトル */
+    .title-area {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .title-emoji { font-size: clamp(2.5rem, 8vw, 4.5rem); }
+    .title-text {
+      color: #fff;
+      font-size: clamp(1.8rem, 5.5vw, 3.2rem);
+      text-shadow: 0 0 20px rgba(100,200,255,0.5), 0 3px 10px rgba(0,0,0,0.4);
+      letter-spacing: 0.12em;
+      margin-top: 8px;
+    }
+    .title-sub {
+      color: rgba(255,255,255,0.6);
+      font-size: clamp(0.9rem, 2.5vw, 1.2rem);
+      margin-top: 8px;
+      letter-spacing: 0.08em;
+    }
+
+    /* ゲームグリッド */
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(280px, 90vw), 1fr));
+      gap: clamp(16px, 4vw, 28px);
+      width: 100%;
+      max-width: 900px;
+    }
+
+    /* ゲームカード */
+    .game-card {
+      background: rgba(255,255,255,0.07);
+      border: 2px solid rgba(255,255,255,0.14);
+      border-radius: 28px;
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1),
+                  background 0.18s, border-color 0.18s,
+                  box-shadow 0.18s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .game-card:hover,
+    .game-card:active {
+      transform: scale(1.05) translateY(-4px);
+      background: rgba(255,255,255,0.14);
+      border-color: rgba(255,255,255,0.35);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+    }
+
+    .card-icon   { font-size: clamp(3.5rem, 10vw, 5.5rem); line-height: 1; }
+    .card-title  {
+      color: #fff;
+      font-size: clamp(1.3rem, 4vw, 1.9rem);
+      font-weight: bold;
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
+    .card-desc   {
+      color: rgba(255,255,255,0.65);
+      font-size: clamp(0.85rem, 2.4vw, 1.05rem);
+      text-align: center;
+      line-height: 1.6;
+    }
+    .card-badge  {
+      background: linear-gradient(135deg, #43C6AC, #0f3460);
+      color: #fff;
+      font-size: clamp(0.75rem, 2vw, 0.9rem);
+      padding: 5px 16px;
+      border-radius: 40px;
+      letter-spacing: 0.06em;
+    }
+
+    /* 近日公開カード */
+    .game-card.coming-soon {
+      opacity: 0.45;
+      cursor: default;
+      pointer-events: none;
+    }
+    .game-card.coming-soon .card-badge {
+      background: rgba(255,255,255,0.2);
+    }
+
+    /* フッター */
+    .footer {
+      margin-top: 48px;
+      color: rgba(255,255,255,0.3);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="title-area">
+    <div class="title-emoji">🎮</div>
+    <div class="title-text">こどもゲームランド</div>
+    <div class="title-sub">すきなゲームをえらんでね！</div>
+  </div>
+
+  <div class="games-grid">
+
+    <!-- かたちあわせ -->
+    <a class="game-card" href="./games/katachi/">
+      <div class="card-icon">🔵🔺🟩</div>
+      <div class="card-title">かたちあわせ</div>
+      <div class="card-desc">まる・さんかく・しかく を<br>おなじかたちにはめよう！</div>
+      <div class="card-badge">あそべるよ！</div>
+    </a>
+
+    <!-- 近日公開枠（将来のゲーム用） -->
+    <div class="game-card coming-soon">
+      <div class="card-icon">🎨</div>
+      <div class="card-title">いろあわせ</div>
+      <div class="card-desc">おなじいろをあわせる<br>カードゲーム</div>
+      <div class="card-badge">もうすぐ！</div>
+    </div>
+
+    <div class="game-card coming-soon">
+      <div class="card-icon">🔢</div>
+      <div class="card-title">かずあそび</div>
+      <div class="card-desc">すうじとかずを<br>あわせよう！</div>
+      <div class="card-badge">もうすぐ！</div>
+    </div>
+
+  </div>
+
+  <div class="footer">崎原工房 こどもゲームランド</div>
+
+</body>
+</html>
