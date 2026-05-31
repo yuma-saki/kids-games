@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>かいてみよう</title>
+  <style>
+    *, *::before, *::after {
+      margin: 0; padding: 0;
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: linear-gradient(160deg, #141E30 0%, #243B55 100%);
+      height: 100svh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 14px 22px;
+      overflow: hidden;
+      font-family: 'Hiragino Maru Gothic Pro', 'BIZ UDGothic', sans-serif;
+    }
+
+    /* ===== ヘッダー ===== */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%; max-width: 720px;
+      flex-shrink: 0;
+    }
+    .back-btn {
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      font-size: clamp(0.8rem, 2.3vw, 1rem);
+      background: rgba(255,255,255,0.13);
+      border: none; border-radius: 30px;
+      padding: 7px 15px; cursor: pointer;
+      flex-shrink: 0;
+    }
+    .title-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .shape-step {
+      color: rgba(255,255,255,0.5);
+      font-size: clamp(0.7rem, 2vw, 0.9rem);
+      letter-spacing: 0.08em;
+    }
+    .shape-title {
+      color: #fff;
+      font-size: clamp(1.4rem, 4.5vw, 2.2rem);
+      text-shadow: 0 0 20px currentColor, 0 3px 8px rgba(0,0,0,0.4);
+      letter-spacing: 0.12em;
+      transition: color 0.4s;
+    }
+    .sound-btn {
+      background: rgba(255,255,255,0.13);
+      border: none; border-radius: 50%;
+      width: clamp(40px,8vw,54px); height: clamp(40px,8vw,54px);
+      font-size: clamp(1.1rem,2.8vw,1.5rem);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, transform 0.15s;
+      flex-shrink: 0;
+    }
+    .sound-btn:active { transform: scale(0.88); }
+    .sound-btn.muted  { background: rgba(255,80,80,0.32); }
+
+    /* ===== 指示文 ===== */
+    .instruction {
+      color: rgba(255,255,255,0.75);
+      font-size: clamp(0.95rem, 3vw, 1.3rem);
+      letter-spacing: 0.1em;
+      flex-shrink: 0;
+    }
+
+    /* ===== キャンバスエリア ===== */
+    .canvas-wrapper {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+    .canvas-wrapper canvas {
+      position: absolute;
+      border-radius: 24px;
+      touch-action: none;
+    }
+    #templateCanvas {
+      background: rgba(255,255,255,0.04);
+      border: 2px solid rgba(255,255,255,0.1);
+    }
+    #drawCanvas { background: transparent; }
+
+    /* ===== 下部UI ===== */
+    .bottom-area {
+      width: 100%; max-width: 560px;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 12px;
+      flex-shrink: 0;
+    }
+
+    /* プログレスバー */
+    .progress-track {
+      width: 100%; height: clamp(14px,3vw,20px);
+      background: rgba(255,255,255,0.15);
+      border-radius: 99px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #FF6B6B, #FFD700, #43FF8E);
+      border-radius: 99px;
+      transition: width 0.25s ease;
+    }
+    .progress-label {
+      color: rgba(255,255,255,0.7);
+      font-size: clamp(0.8rem, 2.3vw, 1rem);
+      letter-spacing: 0.06em;
+    }
+
+    /* ボタン行 */
+    .btn-row {
+      display: flex; gap: 16px; justify-content: center;
+    }
+    .clear-btn {
+      padding: clamp(10px,2.5vw,14px) clamp(22px,5vw,36px);
+      font-size: clamp(1rem,3vw,1.3rem); font-family: inherit;
+      background: rgba(255,255,255,0.15);
+      color: #fff; border: none; border-radius: 40px; cursor: pointer;
+      letter-spacing: 0.08em;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .clear-btn:active { transform: scale(0.93); background: rgba(255,255,255,0.25); }
+
+    .next-btn {
+      padding: clamp(10px,2.5vw,14px) clamp(28px,6vw,46px);
+      font-size: clamp(1rem,3vw,1.3rem); font-family: inherit;
+      background: linear-gradient(135deg, #43C6AC, #3a7bd5);
+      color: #fff; border: none; border-radius: 40px; cursor: pointer;
+      letter-spacing: 0.08em;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+      animation: pulse-btn 1.2s ease-in-out infinite;
+      display: none;
+    }
+    @keyframes pulse-btn {
+      0%,100% { transform: scale(1); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+      50%      { transform: scale(1.04); box-shadow: 0 8px 28px rgba(67,198,172,0.5); }
+    }
+
+    /* ===== 「じょうず！」オーバーレイ ===== */
+    .success-flash {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none; z-index: 80;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .success-flash.show { opacity: 1; }
+    .success-flash-text {
+      font-size: clamp(2.5rem,9vw,5rem);
+      color: #FFD700;
+      text-shadow: 0 0 40px rgba(255,215,0,0.8), 0 4px 12px rgba(0,0,0,0.4);
+      animation: pop 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
+      letter-spacing: 0.1em;
+    }
+    @keyframes pop {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+
+    /* ===== 全クリア ===== */
+    #celebration {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 900;
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 24px;
+    }
+    #celebration.show { display: flex; }
+    .cel-big  { font-size: clamp(3.5rem,12vw,6.5rem); animation: pop 0.4s ease-out both; }
+    .cel-text {
+      color: #fff; font-size: clamp(1.8rem,7vw,4rem);
+      text-align: center; text-shadow: 0 3px 12px rgba(0,0,0,0.4);
+      animation: pop 0.4s 0.2s ease-out both; line-height: 1.4;
+    }
+    .retry-btn {
+      padding: clamp(14px,3.5vw,22px) clamp(36px,9vw,70px);
+      font-size: clamp(1.2rem,4vw,2rem); font-family: inherit;
+      background: linear-gradient(135deg,#43C6AC,#3a7bd5);
+      color: #fff; border: none; border-radius: 60px; cursor: pointer;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.32);
+      animation: pop 0.4s 0.45s ease-out both; letter-spacing: 0.1em;
+    }
+
+    /* 星 */
+    .star {
+      position: fixed; pointer-events: none;
+      font-size: clamp(1.4rem,4vw,2.2rem);
+      animation: fly-star 0.9s ease-out forwards; z-index: 800;
+    }
+    @keyframes fly-star {
+      from { transform: translate(0,0) scale(0.2); opacity: 1; }
+      to   { transform: translate(var(--dx),var(--dy)) scale(1); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <a class="back-btn" href="../../">← もどる</a>
+    <div class="title-area">
+      <div class="shape-step" id="shapeStep">1 / 3</div>
+      <div class="shape-title" id="shapeTitle">⭕ まる</div>
+    </div>
+    <button class="sound-btn" id="soundBtn" onclick="toggleSound()">🔊</button>
+  </div>
+
+  <div class="instruction">ゆびでなぞってみよう！</div>
+
+  <div class="canvas-wrapper" id="canvasWrapper">
+    <canvas id="templateCanvas"></canvas>
+    <canvas id="drawCanvas"></canvas>
+  </div>
+
+  <div class="bottom-area">
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-label" id="progressLabel">0%</div>
+    <div class="btn-row">
+      <button class="clear-btn" onclick="clearDrawing()">けす 🗑️</button>
+      <button class="next-btn"  id="nextBtn" onclick="nextShape()">つぎへ ▶</button>
+    </div>
+  </div>
+
+  <!-- じょうず！フラッシュ -->
+  <div class="success-flash" id="successFlash">
+    <div class="success-flash-text">✨ じょうず！ ✨</div>
+  </div>
+
+  <!-- 全クリア -->
+  <div id="celebration">
+    <div class="cel-big">🎉🌈🎊</div>
+    <div class="cel-text">ぜんぶかけたよ！<br>すごい！！</div>
+    <button class="retry-btn" onclick="restartAll()">もういちど！</button>
+  </div>
+
+<script>
+/* =====================================================
+   サウンドマネージャー（かたちあわせと同じシステム）
+===================================================== */
+const Sound = (() => {
+  let ctx=null, muted=false, bgmTimeout=null, bgmPlaying=false;
+
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)();
+    if (ctx.state==='suspended') ctx.resume();
+    return ctx;
+  }
+  function tone(freq, start, dur, vol=0.2, type='sine') {
+    if (muted) return;
+    const c=getCtx(), osc=c.createOscillator(), gain=c.createGain();
+    osc.connect(gain); gain.connect(c.destination);
+    osc.type=type; osc.frequency.value=freq;
+    gain.gain.setValueAtTime(vol,start);
+    gain.gain.exponentialRampToValueAtTime(0.0001,start+dur);
+    osc.start(start); osc.stop(start+dur+0.05);
+  }
+
+  /* BGM - ゆったりした探索風ループ */
+  const BPM=100, BEAT=60/BPM;
+  const MELODY=[
+    [523,1],[659,1],[784,0.5],[784,0.5],[880,1],[784,1],
+    [659,0.5],[659,0.5],[587,1],[523,1],[523,2],
+    [659,1],[784,1],[880,0.5],[880,0.5],[1047,1],[880,1],
+    [784,0.5],[784,0.5],[698,1],[659,1],[523,2],
+  ];
+  const BASS=[
+    [262,0.45],[262,0.45],[294,0.45],[294,0.45],
+    [330,0.45],[330,0.45],[262,0.45],[262,0.45],
+    [349,0.45],[349,0.45],[392,0.45],[392,0.45],
+    [262,0.45],[262,0.45],[262,0.9],
+  ];
+
+  function playBGMBlock(st) {
+    if (muted||!bgmPlaying) return;
+    let t=st;
+    MELODY.forEach(([f,b])=>{ tone(f,t,b*BEAT*0.7,0.06,'sine'); t+=b*BEAT; });
+    const loopLen=t-st;
+    let bt=st;
+    BASS.forEach(([f,b])=>{ tone(f,bt,b*BEAT*1.8,0.04,'triangle'); bt+=BEAT*2; });
+    bgmTimeout=setTimeout(()=>playBGMBlock(getCtx().currentTime+0.05),loopLen*1000-80);
+  }
+  function startBGM(){if(bgmPlaying||muted)return;bgmPlaying=true;playBGMBlock(getCtx().currentTime+0.1);}
+  function stopBGM(){bgmPlaying=false;if(bgmTimeout){clearTimeout(bgmTimeout);bgmTimeout=null;}}
+
+  function sfxDraw()    { const c=getCtx(),t=c.currentTime; tone(880,t,0.04,0.04,'sine'); }
+  function sfxSuccess() { const c=getCtx(),t=c.currentTime; [659,784,988].forEach((f,i)=>tone(f,t+i*0.1,0.3,0.2,'sine')); }
+  function sfxFanfare() {
+    const c=getCtx(),t=c.currentTime;
+    [523,659,784,1047,1319].forEach((f,i)=>tone(f,t+i*0.1,0.3,0.18,'sine'));
+    [523,659,784].forEach(f=>tone(f,t+0.7,0.8,0.13,'sine'));
+    [2093,2637].forEach((f,i)=>tone(f,t+0.5+i*0.12,0.2,0.05,'sine'));
+  }
+
+  function setMuted(v){muted=v;if(muted)stopBGM();else startBGM();}
+  function isMuted(){return muted;}
+  return {startBGM,stopBGM,sfxDraw,sfxSuccess,sfxFanfare,setMuted,isMuted};
+})();
+
+function toggleSound(){
+  const btn=document.getElementById('soundBtn');
+  Sound.setMuted(!Sound.isMuted());
+  btn.textContent=Sound.isMuted()?'🔇':'🔊';
+  btn.classList.toggle('muted',Sound.isMuted());
+}
+
+/* =====================================================
+   形状定義
+===================================================== */
+const SHAPES = [
+  { name:'まる',   emoji:'⭕', color:'#FF8C00', titleColor:'#FFAB40', build: buildCircle   },
+  { name:'さんかく', emoji:'🔺', color:'#FFD700', titleColor:'#FFEE58', build: buildTriangle },
+  { name:'しかく', emoji:'🟦', color:'#00BFFF', titleColor:'#4DD0E1', build: buildSquare   },
+];
+
+/* テンプレート点列を生成 */
+function buildCircle(cx, cy, r) {
+  const pts=[], N=360;
+  for(let i=0;i<N;i++){
+    const a=(i/N)*Math.PI*2 - Math.PI/2;
+    pts.push({x:cx+r*Math.cos(a), y:cy+r*Math.sin(a)});
+  }
+  return pts;
+}
+function buildTriangle(cx, cy, r) {
+  const verts=[
+    {x:cx,           y:cy-r},
+    {x:cx+r*Math.sqrt(3)/2, y:cy+r/2},
+    {x:cx-r*Math.sqrt(3)/2, y:cy+r/2},
+  ];
+  const pts=[], perSide=120;
+  for(let s=0;s<3;s++){
+    const A=verts[s], B=verts[(s+1)%3];
+    for(let i=0;i<perSide;i++){
+      const t=i/perSide;
+      pts.push({x:A.x+(B.x-A.x)*t, y:A.y+(B.y-A.y)*t});
+    }
+  }
+  return pts;
+}
+function buildSquare(cx, cy, r) {
+  const s=r*0.72;
+  const verts=[{x:cx-s,y:cy-s},{x:cx+s,y:cy-s},{x:cx+s,y:cy+s},{x:cx-s,y:cy+s}];
+  const pts=[], perSide=120;
+  for(let i=0;i<4;i++){
+    const A=verts[i], B=verts[(i+1)%4];
+    for(let j=0;j<perSide;j++){
+      const t=j/perSide;
+      pts.push({x:A.x+(B.x-A.x)*t, y:A.y+(B.y-A.y)*t});
+    }
+  }
+  return pts;
+}
+
+/* テンプレートをcanvasに描画 */
+function drawTemplate(ctx, shape, cx, cy, r, color) {
+  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 10;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  ctx.setLineDash([22,16]);
+  ctx.globalAlpha = 0.55;
+
+  ctx.beginPath();
+  if(shape.name==='まる'){
+    ctx.arc(cx,cy,r,0,Math.PI*2);
+  } else if(shape.name==='さんかく'){
+    const v=[{x:cx,y:cy-r},{x:cx+r*Math.sqrt(3)/2,y:cy+r/2},{x:cx-r*Math.sqrt(3)/2,y:cy+r/2}];
+    ctx.moveTo(v[0].x,v[0].y);
+    v.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
+    ctx.closePath();
+  } else {
+    const s=r*0.72;
+    ctx.rect(cx-s,cy-s,s*2,s*2);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha=1;
+
+  // スタート点（光るドット）
+  const pts=shape.build(cx,cy,r);
+  const start=pts[0];
+  // 外側グロー
+  const grad=ctx.createRadialGradient(start.x,start.y,0,start.x,start.y,22);
+  grad.addColorStop(0,'rgba(255,255,255,0.95)');
+  grad.addColorStop(0.4,color);
+  grad.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.beginPath(); ctx.arc(start.x,start.y,22,0,Math.PI*2);
+  ctx.fillStyle=grad; ctx.fill();
+  // 中心白点
+  ctx.beginPath(); ctx.arc(start.x,start.y,7,0,Math.PI*2);
+  ctx.fillStyle='#fff'; ctx.fill();
+
+  // 「ここから！」ラベル
+  ctx.font=`bold ${Math.round(r*0.18)}px 'Hiragino Maru Gothic Pro', sans-serif`;
+  ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillStyle='rgba(255,255,255,0.8)';
+  ctx.fillText('ここから！', start.x, start.y - 26);
+}
+
+/* =====================================================
+   ゲーム状態
+===================================================== */
+let shapeIndex    = 0;
+let templatePts   = [];
+let covered       = [];
+let coverageVal   = 0;
+let successShown  = false;
+let hue           = 0;
+let lastX=0, lastY=0, midX=0, midY=0;
+let isDrawing     = false;
+let drawSfxTimer  = null;
+
+const TOLERANCE   = 38;  // px  (2歳向けなので広め)
+const THRESHOLD   = 0.65; // 65% で成功
+
+/* =====================================================
+   キャンバス初期化・リサイズ
+===================================================== */
+const templateCanvas = document.getElementById('templateCanvas');
+const drawCanvas     = document.getElementById('drawCanvas');
+const tCtx           = templateCanvas.getContext('2d');
+const dCtx           = drawCanvas.getContext('2d');
+
+function resizeCanvases() {
+  const wrapper  = document.getElementById('canvasWrapper');
+  const wRect    = wrapper.getBoundingClientRect();
+  const size     = Math.round(Math.min(wRect.width - 8, wRect.height - 8, 650));
+
+  [templateCanvas, drawCanvas].forEach(c=>{
+    c.width  = size;
+    c.height = size;
+    c.style.width  = size+'px';
+    c.style.height = size+'px';
+  });
+  initShape();
+}
+
+window.addEventListener('resize', resizeCanvases);
+
+/* =====================================================
+   形状の初期化
+===================================================== */
+function initShape() {
+  const shape  = SHAPES[shapeIndex];
+  const size   = templateCanvas.width;
+  const cx     = size / 2;
+  const cy     = size / 2;
+  const r      = size * 0.36;
+
+  // 状態リセット
+  templatePts  = shape.build(cx, cy, r);
+  covered      = new Array(templatePts.length).fill(false);
+  coverageVal  = 0;
+  successShown = false;
+  hue          = 0;
+
+  // キャンバスクリア
+  dCtx.clearRect(0,0,size,size);
+
+  // テンプレート描画
+  drawTemplate(tCtx, shape, cx, cy, r, shape.color);
+
+  // UI更新
+  document.getElementById('shapeTitle').textContent = shape.emoji+' '+shape.name;
+  document.getElementById('shapeTitle').style.color = shape.titleColor;
+  document.getElementById('shapeStep').textContent  = `${shapeIndex+1} / ${SHAPES.length}`;
+  document.getElementById('progressFill').style.width='0%';
+  document.getElementById('progressLabel').textContent='0%';
+  document.getElementById('nextBtn').style.display='none';
+}
+
+/* =====================================================
+   描画（タッチ）イベント
+===================================================== */
+drawCanvas.addEventListener('pointerdown', e=>{ e.preventDefault(); startStroke(e); }, {passive:false});
+drawCanvas.addEventListener('pointermove', e=>{ e.preventDefault(); continueStroke(e); }, {passive:false});
+drawCanvas.addEventListener('pointerup',   e=>{ e.preventDefault(); endStroke(); });
+drawCanvas.addEventListener('pointercancel', ()=> endStroke());
+
+// 最初のタッチでBGM開始
+document.addEventListener('pointerdown', ()=>Sound.startBGM(), {once:true});
+
+function getPos(e) {
+  const rect = drawCanvas.getBoundingClientRect();
+  const scaleX = drawCanvas.width  / rect.width;
+  const scaleY = drawCanvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top)  * scaleY,
+  };
+}
+
+function startStroke(e) {
+  if (successShown) return;
+  isDrawing = true;
+  drawCanvas.setPointerCapture(e.pointerId);
+  const {x,y} = getPos(e);
+  lastX = x; lastY = y; midX = x; midY = y;
+  hue = (hue + 15) % 360;
+  dCtx.lineWidth  = 32;
+  dCtx.lineCap    = 'round';
+  dCtx.lineJoin   = 'round';
+  dCtx.shadowBlur = 18;
+}
+
+function continueStroke(e) {
+  if (!isDrawing || successShown) return;
+  const {x,y} = getPos(e);
+
+  // レインボーブラシ
+  hue = (hue + 2) % 360;
+  const color = `hsl(${hue},100%,62%)`;
+  dCtx.strokeStyle = color;
+  dCtx.shadowColor = color;
+
+  // スムーズな曲線（2点間を二次ベジェで補間）
+  const newMidX = (lastX + x) / 2;
+  const newMidY = (lastY + y) / 2;
+  dCtx.beginPath();
+  dCtx.moveTo(midX, midY);
+  dCtx.quadraticCurveTo(lastX, lastY, newMidX, newMidY);
+  dCtx.stroke();
+  midX = newMidX; midY = newMidY;
+  lastX = x;      lastY = y;
+
+  // カバレッジ更新
+  updateCoverage(x, y);
+
+  // 描画音（間引き）
+  if (!drawSfxTimer) {
+    drawSfxTimer = setTimeout(()=>{ Sound.sfxDraw(); drawSfxTimer=null; }, 80);
+  }
+}
+
+function endStroke() {
+  isDrawing = false;
+  dCtx.shadowBlur = 0;
+}
+
+/* =====================================================
+   カバレッジ計算
+===================================================== */
+function updateCoverage(tx, ty) {
+  if (successShown) return;
+  const tol2 = TOLERANCE * TOLERANCE;
+  for (let i=0; i<templatePts.length; i++) {
+    if (covered[i]) continue;
+    const dx = tx - templatePts[i].x;
+    const dy = ty - templatePts[i].y;
+    if (dx*dx + dy*dy <= tol2) covered[i] = true;
+  }
+  const count = covered.filter(Boolean).length;
+  coverageVal = count / templatePts.length;
+
+  const pct = Math.round(coverageVal * 100);
+  document.getElementById('progressFill').style.width = pct+'%';
+  document.getElementById('progressLabel').textContent = pct+'%';
+
+  if (coverageVal >= THRESHOLD && !successShown) {
+    triggerSuccess();
+  }
+}
+
+/* =====================================================
+   成功演出
+===================================================== */
+function triggerSuccess() {
+  successShown = true;
+  Sound.sfxSuccess();
+  spawnStars();
+
+  // 「じょうず！」フラッシュ
+  const flash = document.getElementById('successFlash');
+  flash.classList.add('show');
+  setTimeout(()=>flash.classList.remove('show'), 1400);
+
+  // プログレスを100%に
+  document.getElementById('progressFill').style.width='100%';
+  document.getElementById('progressLabel').textContent='100%';
+
+  // 「つぎへ」ボタンを表示
+  setTimeout(()=>{
+    document.getElementById('nextBtn').style.display='block';
+  }, 600);
+}
+
+function spawnStars() {
+  const rect = drawCanvas.getBoundingClientRect();
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top  + rect.height/2;
+  const em = ['⭐','✨','🌟','💫','🎊','🌈'];
+  for(let i=0;i<16;i++){
+    const el=document.createElement('div');
+    el.className='star'; el.textContent=em[i%em.length];
+    const ang=(i/16)*Math.PI*2+Math.random()*0.4;
+    const d=80+Math.random()*120;
+    el.style.left=cx+'px'; el.style.top=cy+'px';
+    el.style.setProperty('--dx',Math.cos(ang)*d+'px');
+    el.style.setProperty('--dy',Math.sin(ang)*d+'px');
+    el.style.animationDelay=(i*0.04)+'s';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),980);
+  }
+}
+
+/* =====================================================
+   つぎへ / リセット
+===================================================== */
+function nextShape() {
+  shapeIndex++;
+  if (shapeIndex >= SHAPES.length) {
+    // 全クリア
+    Sound.stopBGM();
+    Sound.sfxFanfare();
+    document.getElementById('celebration').classList.add('show');
+  } else {
+    initShape();
+  }
+}
+
+function clearDrawing() {
+  dCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  covered      = new Array(templatePts.length).fill(false);
+  coverageVal  = 0;
+  successShown = false;
+  document.getElementById('progressFill').style.width='0%';
+  document.getElementById('progressLabel').textContent='0%';
+  document.getElementById('nextBtn').style.display='none';
+}
+
+function restartAll() {
+  shapeIndex = 0;
+  document.getElementById('celebration').classList.remove('show');
+  initShape();
+  Sound.startBGM();
+}
+
+/* =====================================================
+   起動
+===================================================== */
+// DOMが描画されてからリサイズ
+requestAnimationFrame(()=> requestAnimationFrame(resizeCanvases));
+</script>
+</body>
+</html>
